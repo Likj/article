@@ -433,11 +433,13 @@ function sendRequest(arr, max, callback) {
             one.then( () => {fetchArr.splice(fetchArr.indexOf(one), 1)}); // 当promise执行完毕后，从数组删除
             fetchArr.push(one);  //将当前的promise存入并发数组中       其实将这个push放到上一行会更好理解，那样就是我们同步的思维顺序，先push进去，再等promise执行完了之后再删除。  但由于then是异步的，所以怎么放都可以。
 
-            let p = Promise.resolve();
+            let p = Promise.resolve(); 
             if (fetchArr.length >= max) {     // 当并行数量达到最大后， 用race比较 第一个完成的， 然后再调用一下函数自身。
                 p = Promise.race(fetchArr);
             }
-            return p.then(() => toFetch());
+            
+            return p.then(() => toFetch()); // 16ms 
+
         }
         
         // arr循环完后， 现在fetchArr里面剩下最后max个promise对象， 使用all等待所有的都完成之后执行callback
@@ -445,4 +447,144 @@ function sendRequest(arr, max, callback) {
             callback();
         })
 }
+```
+### promise.all 实现简版本
+```
+function all(iterable) {
+  return new Promise((resolve, reject) => {
+    let index = 0;
+    for (const promise of iterable) {
+      // Capture the current value of `index`
+      const currentIndex = index;
+      promise.then(
+        (value) => {
+          if (anErrorOccurred) return;
+          result[currentIndex] = value;
+          elementCount++;
+          if (elementCount === result.length) {
+            resolve(result);
+          }
+        },
+        (err) => {
+          if (anErrorOccurred) return;
+          anErrorOccurred = true;
+          reject(err);
+        });
+      index++;
+    }
+    if (index === 0) {
+      resolve([]);
+      return;
+    }
+    let elementCount = 0;
+    let anErrorOccurred = false;
+    const result = new Array(index);
+  });
+}
+```
+### promise.race 的简单实现。不执行安全检查
+```
+function race(iterable) {
+  return new Promise((resolve, reject) => {
+    for (const promise of iterable) {
+      promise.then(
+        (value) => {
+          if (settlementOccurred) return;
+          settlementOccurred = true;
+          resolve(value);
+        },
+        (err) => {
+          if (settlementOccurred) return;
+          settlementOccurred = true;
+          reject(err);
+        });
+    }
+    let settlementOccurred = false;
+  });
+}
+
+```
+
+```
+function resolveAfter(ms, value=undefined) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => resolve(value), ms);
+  });
+}
+
+function timeout(timeoutInMs, promise) {
+  return Promise.race([
+    promise,
+    resolveAfter(timeoutInMs,
+      Promise.reject(new Error('Operation timed out'))),
+  ]);
+}
+timeout(100, resolveAfter(2000, 'Result!'))
+  .catch(err => assert.deepEqual(err, new Error('Operation timed out')));
+```
+
+function fun1() {
+    for (var i = 0; i < 10; i++) {
+        setTimeout(() => {
+            console.log(i)
+        }, 0)
+    }
+}
+function fun12() {
+    for (var i = 0; i < 10; i++) {
+        const j = i;
+        setTimeout(() => {
+            console.log(j)
+        }, 0)
+    }
+}
+function fun13() {
+    for (var i = 0; i < 10; i++ ) {
+        (function(i){
+            setTimeout(() => {
+                console.log(i)
+            }, 0)
+        })(i)
+    }
+}
+function fun2() {
+    for (let i = 0; i < 10; i++) {
+        setTimeout(() => {
+            console.log(i)
+        }, 0)
+    }
+}
+function fun21() {
+    for (var i = 0; i < 10; i++) {
+        Promise.resolve(i).then(result => {
+            console.log(i)
+        })
+    }
+}
+function fun22() {
+    for (let i = 0; i < 10; i++) {
+        Promise.resolve(i).then(result => {
+            console.log(i)
+        })
+    }
+}
+
+
+
+
+
+1. 比如 var p = Promise.resolve('传入的参数') 直接进入 p.then()
+2. 比如 var p = Promise.reject('传入参数') 直接进入p.catch()
+3. then 监听的是上一次 resolve里面的返回值，如果返回值是一个promise； 那么then 监听的是 promise的结果；
+```
+function resolveAfter(value) {
+    return new Promise(resolve => {
+        setTimeout(() => {resolve(value)}, 500)
+    })
+}
+// then 监听的是 resolve('数据');  resolve 返回的是 '数据'
+resolveAfter('数据').then(res => console.log('成功', res)).catch(err => console.log('失败', err))
+
+// then 监听的是resolve(Promise.reject('失败信息'))  ; resolve 返回的是 Promise.reject(‘失败信息’); 是一个promise 直接走到catch里面
+resolveAfter(Promise.reject('失败信息')).then(res => console.log('成功', res)).catch(err => console.log('失败', err))
 ```
