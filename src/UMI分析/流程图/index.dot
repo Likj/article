@@ -1,0 +1,9 @@
+digraph index {
+    umi -> core;
+    new_Service -> service_run -> new_config -> new_BabelRegister -> this_babelRegister_setOnlyMap
+    -> this_int -> this_setStage ->this_applyPlugins -> this_runCommand
+    ;
+    Service -> CoreSerice -> EventEmitter;
+    ServiceStage;
+    
+}
